@@ -60,8 +60,7 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {
       forking:{
-          url: "https://moonbeam.blastapi.io/e37c7680-1406-41e6-8d2f-b25b8375b899",
-          // url: 'https://moonbeam.api.onfinality.io/public',
+          url: MOONBEAM_ENDPOINT,
           blockNumber: 2364293
       },
       accounts: {
@@ -78,18 +77,18 @@ const config: HardhatUserConfig = {
     },
     moonriver: {
       url: 'https://rpc.api.moonriver.moonbeam.network',
-      chainId: 1285, // (hex: 0x505),
+      chainId: 1285,
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
     moonbeam: {
       // url: MOONBEAM_ENDPOINT,
-      url: 'https://moonbeam.api.onfinality.io/public',
-      chainId: 1284, // (hex: 0x505),
+      url: MOONBEAM_ENDPOINT,
+      chainId: 1284,
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
     telos: {
       url: 'https://mainnet.telos.net/evm',
-      chainId: 40, // (hex: 0x505),
+      chainId: 40,
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
   },
