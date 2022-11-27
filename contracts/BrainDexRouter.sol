@@ -49,6 +49,9 @@ contract BrainDexRouter is Ownable, BrainDexTypes {
         _;
     }
 
+    /** 
+     @notice Performs a multi-path swap using ETH as the principal input and tokens as the principal output.
+    */
     function multiSwapEthForTokens(
         address tokenOut,
         address to,
@@ -73,7 +76,9 @@ contract BrainDexRouter is Ownable, BrainDexTypes {
         uint256[][] memory splitAmountsOut = getSplitSwapAmountsOut(splitPaths);
         uint256 netAmountOut = sumSplitSwapAmountsOut(splitAmountsOut);
 
-        if (netAmountOut < amountOutMin) revert BDEX_AmountOutLow();
+        //Early revert in the event of an unfavorable swap.
+        if (netAmountOut < amountOutMin) 
+            revert BDEX_AmountOutLow();
 
         IWETH(WETH).deposit{value: msg.value}();
         _executeSplitSwap(
@@ -92,6 +97,9 @@ contract BrainDexRouter is Ownable, BrainDexTypes {
         TransferHelper.safeTransfer(tokenOut, to, netTokens);
     }
 
+    /** 
+     @notice Performs a multi-path swap using tokens as the principal input and ETH as the principal output.
+    */
     function multiSwapTokensForEth(
         address tokenIn,
         address to,
@@ -110,7 +118,10 @@ contract BrainDexRouter is Ownable, BrainDexTypes {
             splitPaths
         );
         uint256 netAmountOut = sumSplitSwapAmountsOut(splitAmountsOut);
-        if (netAmountOut < amountOutMin) revert BDEX_AmountOutLow();
+
+        //Early revert in the event of an unfavorable swap.
+        if (netAmountOut < amountOutMin) 
+            revert BDEX_AmountOutLow();
 
         // Initial transfer of tokens from user
         TransferHelper.safeTransferFrom(tokenIn, msg.sender, address(this), amountIn);
@@ -128,6 +139,9 @@ contract BrainDexRouter is Ownable, BrainDexTypes {
         _sendEth(to, netTokens);
     }
 
+    /** 
+     @notice Performs a multi-path swap using tokens as the principal input and tokens as the principal output.
+    */
     function multiSwapTokensForTokens(
         address tokenIn,
         address tokenOut,
@@ -144,6 +158,8 @@ contract BrainDexRouter is Ownable, BrainDexTypes {
             splitPaths
         );
         uint256 netAmountOut = sumSplitSwapAmountsOut(splitAmountsOut);
+
+        //Early revert in the event of an unfavorable swap.
         if (netAmountOut < amountOutMin)
             revert BDEX_AmountOutLow();
 
@@ -172,13 +188,18 @@ contract BrainDexRouter is Ownable, BrainDexTypes {
     ) internal {
         uint256 lenOuter = splitPaths.length;
         for (uint i; i<lenOuter;) {
-            if (splitPaths[i].swapData[0].swapType < SwapType.SaddleStable) {
-                TransferHelper.safeTransfer(tokenIn, splitPaths[i].pools[0], splitPaths[i].amountIn);
-            }
-            uint256 len = splitPaths[i].pools.length;
+
+            SplitPaths memory splitPath = splitPaths[i];
+            SwapData[] memory swapData = splitPath.swapData;
+            address[] memory pools = splitPath.pools;
             uint256[] memory amountsOut = splitAmountsOut[i];
-            SwapData[] memory swapData = splitPaths[i].swapData;
-            address[] memory pools = splitPaths[i].pools;
+
+            uint256 len = pools.length;
+
+            if (swapData[0].swapType < SwapType.SaddleStable) {
+                TransferHelper.safeTransfer(tokenIn, pools[0], splitPath.amountIn);
+            }
+
             for(uint j; j<len;) {
                 SwapData memory swapData_ = swapData[j];
                 // Constant product swap
@@ -201,7 +222,7 @@ contract BrainDexRouter is Ownable, BrainDexTypes {
 
     function getSplitSwapAmountOut(
         SplitPaths[] calldata splitPaths
-    ) public view returns(uint256 amount_out) {
+    ) public view returns(uint256) {
         return sumSplitSwapAmountsOut(
             getSplitSwapAmountsOut(splitPaths)
         );    
@@ -296,8 +317,6 @@ contract BrainDexRouter is Ownable, BrainDexTypes {
     ) internal view returns(uint256, uint256) {
         uint256 amountDiff = netTokens - amountOutMin;
         uint256 feePercent = amountDiff * 10000 / ((amountOutMin + netTokens) / 2); // in bips
-        uint256 feeAmount;
-        uint256 amountNetFee;
 
         if (feePercent < _minFee) {
             feePercent = _minFee;
@@ -305,8 +324,8 @@ contract BrainDexRouter is Ownable, BrainDexTypes {
         else if (feePercent > _maxFee) {
             feePercent = _maxFee;
         }
-        feeAmount = (netTokens * feePercent / 10000);
-        amountNetFee = netTokens - feeAmount; 
+        uint256 feeAmount = (netTokens * feePercent / 10000);
+        uint256 amountNetFee = netTokens - feeAmount; 
         return (feeAmount, amountNetFee);
     }
 
@@ -319,7 +338,7 @@ contract BrainDexRouter is Ownable, BrainDexTypes {
     ) internal {
         address to_;
         uint256 iPlusOne = i+1;
-    
+
         (uint256 amount0Out, uint256 amount1Out) = swapData[i].poolInPos == 0 ? (uint256(0), amountsOut[iPlusOne]) : (amountsOut[iPlusOne], uint256(0));
         if (iPlusOne < swapLen) {
             to_ = (swapData[iPlusOne].swapType < SwapType.SaddleStable) ? pools[iPlusOne] : address(this);   
@@ -356,16 +375,18 @@ contract BrainDexRouter is Ownable, BrainDexTypes {
         uint256 i
     ) internal {
         uint256 iPlusOne = i+1;
+        SwapData memory data = swapData[i];
+        
         uint256 amountOutThis = ISaddleStableSwap(pools[i]).swap(
-            swapData[i].poolInPos, 
-            swapData[i].poolOutPos, 
+            data.poolInPos, 
+            data.poolOutPos, 
             amountsOut[i], 
             amountsOut[iPlusOne], 
             ~uint256(0)
         );
         if (iPlusOne < swapLen) {
             if (swapData[iPlusOne].swapType < SwapType.SaddleStable) {
-                TransferHelper.safeTransfer(swapData[i].tokenOut, pools[iPlusOne], amountOutThis);
+                TransferHelper.safeTransfer(data.tokenOut, pools[iPlusOne], amountOutThis);
             }
         }
     }
@@ -376,13 +397,8 @@ contract BrainDexRouter is Ownable, BrainDexTypes {
         uint256 poolInPos, 
         uint256 fee
     ) internal view returns(uint256 amtOut) {
-        uint256 reserveIn;
-        uint256 reserveOut;
-        //Scope to reduce max memory height
-        {
-            (uint256 reserve0, uint256 reserve1) = IKPool(pool).getReserves();
-            (reserveIn, reserveOut) = poolInPos == 0 ? (reserve0, reserve1) : (reserve1, reserve0);
-        }
+        (uint256 reserve0, uint256 reserve1) = IKPool(pool).getReserves();
+        (uint256 reserveIn, uint256 reserveOut) = poolInPos == 0 ? (reserve0, reserve1) : (reserve1, reserve0);
         uint256 amountInWithFee = amountIn * fee;
         uint256 numerator = amountInWithFee * reserveOut;
         uint256 denominator = (reserveIn * 1_000_000) + amountInWithFee;
