@@ -1,13 +1,10 @@
-# Sample Hardhat Project
+# BrainDex Smart Contracts
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a script that deploys that contract.
+Core smart contract repo for BrainDex aggregator.
 
-Try running some of the following tasks:
+Tests are configured for Moonbeam, assume a forked chain state, and require a patched json-rpc/client.js to run correctly.
 
+To run:
 ```shell
-npx hardhat help
 npx hardhat test
-REPORT_GAS=true npx hardhat test
-npx hardhat node
-npx hardhat run scripts/deploy.ts
 ```

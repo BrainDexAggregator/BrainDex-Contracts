@@ -30,7 +30,7 @@ contract BrainDexRouter is Ownable, BrainDexTypes {
     address private _feeDeposit;
     uint256 private _minFee; // In bips
     uint256 private _maxFee; // In bips
-    uint256 constant feeCap = 1000;
+    uint256 constant private feeCap = 1000;
 
     address public immutable WETH;
 
