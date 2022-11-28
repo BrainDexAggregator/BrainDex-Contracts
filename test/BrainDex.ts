@@ -34,7 +34,7 @@ describe("BrainDex", function () {
         const USDC_WH_CONTRACT = await ERC20.attach(USDC_WH);
 
         const WETH_USDC_MC = "0x8CCBbcAF58f5422F6efD4034d8E8a3c9120ADf79";
-        const STEL_STAB_4POOL = "0xB1BC9f56103175193519Ae1540A0A4572b1566F6"
+        const STEL_STAB_4POOL = "0xB1BC9f56103175193519Ae1540A0A4572b1566F6";
 
         // Contracts are deployed using the first signer/account by default
         const [owner, otherAccount] = await ethers.getSigners();
