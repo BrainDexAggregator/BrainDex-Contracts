@@ -193,7 +193,7 @@ describe("BrainDex", function () {
         });
     });
     describe("Swaps", function () {
-        describe.only("Happy path", function () {
+        describe("Happy path", function () {
             it("multiSwapEthForTokens single path", async function () {
                 const { 
                     router, WETH, BUSD, WETH_USDC_MC, USDC_WH, STEL_STAB_4POOL,
@@ -638,11 +638,29 @@ describe("BrainDex", function () {
                 .to.changeEtherBalance(otherAccount.address, fees[1])
                 .to.changeTokenBalance(WETH_CONTRACT, owner.address, fees[0])
             });
+            
         });
 
         describe("Sad path", function () {
             it("multiSwapTokensForTokens single path", async function () {
 
+            });
+        });
+
+        describe("Fee calculation", function () {
+            it("Fee should equal half of difference between netTokens and AmountOutMin.", async function () {
+                const { 
+                    router, WETH, BUSD, WETH_USDC_MC, USDC_WH, STEL_STAB_4POOL,
+                    WETH_CONTRACT, BUSD_CONTRACT, 
+                    owner, otherAccount, now 
+                } = await loadFixture(deployBrainDexFixture);
+
+                const amountIn = makeBigNumber(75, 18); // 75 WGLMR
+                
+                const fees = await router.getFee(amountIn, amountIn.mul(999).div(1000));
+                console.log(fees);
+                expect(fees[0]).to.equal(amountIn.sub(amountIn.mul(999).div(1000)).div(2));
+                console.log
             });
         });
 

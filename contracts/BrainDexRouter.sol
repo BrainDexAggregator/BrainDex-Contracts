@@ -311,12 +311,15 @@ contract BrainDexRouter is Ownable, BrainDexTypes {
         return _getFee(netTokens, amountOutMin);
     }
 
+    // Fee is equal to half of the difference between netTokens and AmountOutMin, floored at _minFee 
+    // and capped at _maxFee.
+
     function _getFee(
         uint256 netTokens, 
         uint256 amountOutMin
     ) internal view returns(uint256, uint256) {
         uint256 amountDiff = netTokens - amountOutMin;
-        uint256 feePercent = amountDiff * 10000 / ((amountOutMin + netTokens) / 2); // in bips
+        uint256 feePercent = amountDiff * 10000 / ((amountOutMin + netTokens) / 2) / 2; // in bips
 
         if (feePercent < _minFee) {
             feePercent = _minFee;
