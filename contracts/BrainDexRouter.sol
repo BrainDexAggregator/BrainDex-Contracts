@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity =0.8.15;
+pragma solidity 0.8.15;
 
 //FIXME: SAFEERC20
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -50,7 +50,9 @@ contract BrainDexRouter is Ownable, BrainDexTypes {
     }
 
     /** 
-     @notice Performs a multi-path swap using ETH as the principal input and tokens as the principal output.
+     * @notice Performs a multi-path swap using the network token as the principal input and tokens as the principal output.
+     * @dev Executes a swap according to the data structure provided in `splitPaths`. `amountOutMin` is the minimum
+     * number of tokens to be returned prior to the router fee.
     */
     function multiSwapEthForTokens(
         address tokenOut,
@@ -59,7 +61,6 @@ contract BrainDexRouter is Ownable, BrainDexTypes {
         uint256 deadline,
         SplitPaths[] calldata splitPaths
     ) external payable ensureDeadline(deadline) {
-        // Setup, get initial balance
         
         uint256 bal0 = IERC20(tokenOut).balanceOf(address(this));
         uint256 netAmountIn;
@@ -98,7 +99,9 @@ contract BrainDexRouter is Ownable, BrainDexTypes {
     }
 
     /** 
-     @notice Performs a multi-path swap using tokens as the principal input and ETH as the principal output.
+     * @notice Performs a multi-path swap using tokens as the principal input and ETH as the principal output.
+     * @dev Executes a swap according to the data structure provided in `splitPaths`. `amountOutMin` is the minimum
+     * number of tokens to be returned prior to the router fee.
     */
     function multiSwapTokensForEth(
         address tokenIn,
@@ -140,7 +143,9 @@ contract BrainDexRouter is Ownable, BrainDexTypes {
     }
 
     /** 
-     @notice Performs a multi-path swap using tokens as the principal input and tokens as the principal output.
+     * @notice Performs a multi-path swap using tokens as the principal input and tokens as the principal output.
+     * @dev Executes a swap according to the data structure provided in `splitPaths`. `amountOutMin` is the minimum
+     * number of tokens to be returned prior to the router fee.
     */
     function multiSwapTokensForTokens(
         address tokenIn,
