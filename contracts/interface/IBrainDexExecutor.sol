@@ -1,0 +1,7 @@
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.0;
+
+interface IBrainDexExecutor {
+    function executeSplitSwap(address tokenIn, address tokenOut, uint256 amountOutMin, bytes calldata swapData) external;
+}
