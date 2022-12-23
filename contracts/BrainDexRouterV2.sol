@@ -11,31 +11,31 @@ import { IBrainDexExecutor } from "./interface/IBrainDexExecutor.sol";
 
 import './libraries/TransferHelper.sol';
 
-import { BrainDexTypes } from "./BrainDexTypes.sol";
-
 error BDEX_AmountOutLow();
-error BDEX_BadAmountIn();
-error BDEX_BadSwapType();
 error BDEX_Expired();
+error BDEX_Paused();
 
 error BDEX_BadFeeOrder();
 error BDEX_FeeTooHigh();
 
 error BDEX_AddressZero();
+error BDEX_AmountOutMinZero();
+error BDEX_SwapDataZero();
 
 error BDEX_EthTransferFailed();
 
-contract BrainDexRouterV2 is Ownable, BrainDexTypes {
+contract BrainDexRouterV2 is Ownable {
 
     address private _feeDeposit;
     uint256 private _minFee; // In bips
     uint256 private _maxFee; // In bips
-    uint256 constant private feeCap = 1000;
+    uint256 constant private feeCap = 200;
 
     address public immutable WETH;
     IBrainDexExecutor private _executor;
 
     bool private _feeOn;
+    bool private _paused;
 
     constructor(address WETH_, address executor_) {
         _feeDeposit = msg.sender;
@@ -51,10 +51,24 @@ contract BrainDexRouterV2 is Ownable, BrainDexTypes {
         _;
     }
 
+    modifier notPaused() {
+        if (_paused) revert BDEX_Paused();
+        _;
+    }
+
+    /**
+     * @notice Upon completion of any swap, the executor contract will transfer its balance of `tokenOut` back 
+     * to this contract, final balance checks will be completed, fees will be processed and the results of the 
+     * swap will be transferred to the user.
+     */
+
     /** 
      * @notice Performs a multi-path swap using the network token as the principal input and tokens as the principal output.
-     * @dev Executes a swap according to the data structure provided in `splitPaths`. `amountOutMin` is the minimum
-     * number of tokens to be returned prior to the router fee.
+     * @param tokenOut Token to recieve after swap.
+     * @param to Address to recieve resulting amount of tokenOut tokens.
+     * @param amountOutMin Minimum amount of tokenOut to recieve, pre optimizer fee.
+     * @param deadline Deadline for executing the swap. The transaction will revert if blocktime exceeds `deadline`.
+     * @param swapData bytes package defining swap paramters for the executor contract.
     */
     function multiSwapEthForTokens(
         address tokenOut,
@@ -62,13 +76,13 @@ contract BrainDexRouterV2 is Ownable, BrainDexTypes {
         uint256 amountOutMin,
         uint256 deadline,
         bytes calldata swapData
-    ) external payable ensureDeadline(deadline) {
+    ) external payable notPaused ensureDeadline(deadline) {
         
-        uint256 bal0 = IERC20(tokenOut).balanceOf(address(this));
+        if (amountOutMin == 0) revert BDEX_AmountOutMinZero();
+        if (swapData.length == 0) revert BDEX_SwapDataZero();
 
         IWETH(WETH).deposit{value: msg.value}();
         TransferHelper.safeTransfer(WETH, address(_executor), msg.value);
-        
         _executor.executeSplitSwap(
             WETH,
             tokenOut,
@@ -77,19 +91,25 @@ contract BrainDexRouterV2 is Ownable, BrainDexTypes {
         );
 
         // Final balance checking
-        uint256 netTokens = IERC20(tokenOut).balanceOf(address(this)) - bal0;
+        uint256 netTokens = IERC20(tokenOut).balanceOf(address(this)) - 1;
 
         if (netTokens < amountOutMin) revert BDEX_AmountOutLow();
 
         netTokens = _feeOn ? _sendAdminFee(tokenOut, netTokens, amountOutMin) : netTokens;
+        
+        address receiver = to == address(0) ? msg.sender : to;
         // Transfer tokens net fees to user.
-        TransferHelper.safeTransfer(tokenOut, to, netTokens);
+        TransferHelper.safeTransfer(tokenOut, receiver, netTokens);
     }
 
     /** 
      * @notice Performs a multi-path swap using tokens as the principal input and ETH as the principal output.
-     * @dev Executes a swap according to the data structure provided in `splitPaths`. `amountOutMin` is the minimum
-     * number of tokens to be returned prior to the router fee.
+     * @param tokenIn Input token for swap.
+     * @param to Address to recieve resulting amount of tokenOut tokens.
+     * @param amountIn Amount of `tokenIn` tokens with which to initiate the swap.
+     * @param amountOutMin Minimum amount of tokenOut to recieve, pre optimizer fee.
+     * @param deadline Deadline for executing the swap. The transaction will revert if blocktime exceeds `deadline`.
+     * @param swapData bytes package defining swap paramters for the executor contract.
     */
     function multiSwapTokensForEth(
         address tokenIn,
@@ -98,7 +118,10 @@ contract BrainDexRouterV2 is Ownable, BrainDexTypes {
         uint256 amountOutMin,
         uint256 deadline,
         bytes calldata swapData
-    ) external ensureDeadline(deadline) {
+    ) external notPaused ensureDeadline(deadline) {
+
+        if (amountOutMin == 0) revert BDEX_AmountOutMinZero();
+        if (swapData.length == 0) revert BDEX_SwapDataZero();
 
         // Initial transfer of tokens from user
         TransferHelper.safeTransferFrom(tokenIn, msg.sender, address(_executor), amountIn);
@@ -115,14 +138,22 @@ contract BrainDexRouterV2 is Ownable, BrainDexTypes {
         if (netTokens < amountOutMin) revert BDEX_AmountOutLow();
         
         netTokens = _feeOn ? _sendAdminFee(WETH, netTokens, amountOutMin) : netTokens;
+
+        address receiver = to == address(0) ? msg.sender : to;
+
         IWETH(WETH).withdraw(netTokens);
-        _sendEth(to, netTokens);
+        _sendEth(receiver, netTokens);
     }
 
     /** 
      * @notice Performs a multi-path swap using tokens as the principal input and tokens as the principal output.
-     * @dev Executes a swap according to the data structure provided in `splitPaths`. `amountOutMin` is the minimum
-     * number of tokens to be returned prior to the router fee.
+     * @param tokenIn Input token for swap.
+     * @param tokenOut Token to recieve after swap.
+     * @param to Address to recieve resulting amount of tokenOut tokens.
+     * @param amountIn Amount of `tokenIn` tokens with which to initiate the swap.
+     * @param amountOutMin Minimum amount of tokenOut to recieve, pre optimizer fee.
+     * @param deadline Deadline for executing the swap. The transaction will revert if blocktime exceeds `deadline`.
+     * @param swapData bytes package defining swap paramters for the executor contract. 
     */
     function multiSwapTokensForTokens(
         address tokenIn,
@@ -132,7 +163,10 @@ contract BrainDexRouterV2 is Ownable, BrainDexTypes {
         uint256 amountOutMin,
         uint256 deadline,
         bytes calldata swapData
-    ) external ensureDeadline(deadline) {
+    ) external notPaused ensureDeadline(deadline) {
+
+        if (amountOutMin == 0) revert BDEX_AmountOutMinZero();
+        if (swapData.length == 0) revert BDEX_SwapDataZero();
 
         // Initial transfer of tokens from user
         TransferHelper.safeTransferFrom(tokenIn, msg.sender, address(_executor), amountIn);
@@ -149,7 +183,10 @@ contract BrainDexRouterV2 is Ownable, BrainDexTypes {
 
         if (netTokens < amountOutMin) revert BDEX_AmountOutLow();
         netTokens = _feeOn ? _sendAdminFee(tokenOut, netTokens, amountOutMin) : netTokens;
-        TransferHelper.safeTransfer(tokenOut, to, netTokens);
+        
+        address receiver = to == address(0) ? msg.sender : to;
+        // Transfer tokens net fees to user.
+        TransferHelper.safeTransfer(tokenOut, receiver, netTokens);
 
     }
 
@@ -191,30 +228,6 @@ contract BrainDexRouterV2 is Ownable, BrainDexTypes {
         return (feeAmount, amountNetFee);
     }
 
-    function _getAmountOutK(
-        address pool, 
-        uint256 amountIn, 
-        uint256 poolInPos, 
-        uint256 fee
-    ) internal view returns(uint256 amtOut) {
-        (uint256 reserve0, uint256 reserve1) = IKPool(pool).getReserves();
-        (uint256 reserveIn, uint256 reserveOut) = poolInPos == 0 ? (reserve0, reserve1) : (reserve1, reserve0);
-        uint256 amountInWithFee = amountIn * fee;
-        uint256 numerator = amountInWithFee * reserveOut;
-        uint256 denominator = (reserveIn * 1_000_000) + amountInWithFee;
-
-        amtOut = numerator/denominator;
-    }
-
-    function _getAmountOutSaddleStable(
-        address pool, 
-        uint256 amountIn, 
-        uint8 poolInPos, 
-        uint8 poolOutPos
-    ) internal view returns(uint256 amtOut) {
-        amtOut = ISaddleStableSwap(pool).calculateSwap(poolInPos, poolOutPos, amountIn);
-    }
-
     function _sendEth(address to, uint256 value) internal {
         (bool success, ) = to.call{value: value}(new bytes(0));
         if(!success) revert BDEX_EthTransferFailed();
@@ -235,6 +248,14 @@ contract BrainDexRouterV2 is Ownable, BrainDexTypes {
 
     function setFeeOn(bool state) external onlyOwner {
         _feeOn = state;
+    }
+
+    function setPaused(bool state) external onlyOwner {
+        _paused = state;
+    }
+
+    function isPaused() external view returns(bool paused) {
+        paused = _paused;
     }
 
     function minFee() public view returns(uint256 fee) {
