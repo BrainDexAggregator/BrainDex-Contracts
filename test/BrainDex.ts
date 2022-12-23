@@ -362,7 +362,7 @@ describe("BrainDex", function () {
                 .to.changeTokenBalance(BUSD_CONTRACT, owner.address, fees[0])
             });
 
-            it("multiSwapTokensForTokens multi path", async function () {
+            it.only("multiSwapTokensForTokens multi path", async function () {
                 const { 
                     router, WETH, BUSD, WETH_USDC_MC, USDC_WH, STEL_STAB_4POOL,
                     WETH_CONTRACT, BUSD_CONTRACT, USDC_WH_CONTRACT,
@@ -448,6 +448,7 @@ describe("BrainDex", function () {
                 .to.changeTokenBalance(WETH_CONTRACT, otherAccount.address, makeBigNumber(20, 18).mul(-1))
                 .to.changeTokenBalance(BUSD_CONTRACT, otherAccount.address, fees2[1])
                 .to.changeTokenBalance(BUSD_CONTRACT, owner.address, fees2[0])
+                expect(await BUSD_CONTRACT.balanceOf(router.address)).to.equal(1)
 
             });
 
