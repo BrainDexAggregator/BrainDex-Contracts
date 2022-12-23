@@ -57,7 +57,7 @@ const config: HardhatUserConfig = {
     hardhat: {
       forking:{
           url: MOONBEAM_ENDPOINT,
-          blockNumber: 2364293
+          blockNumber: 2574367
       },
       accounts: {
         count: 50
