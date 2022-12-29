@@ -20,6 +20,8 @@ task('accounts', 'Prints the list of accounts', async (taskArgs, hre) => {
 });
 
 const MOONBEAM_ENDPOINT = process.env.MOONBEAM_ENDPOINT !== undefined ? process.env.MOONBEAM_ENDPOINT : "https://rpc.api.moonbeam.network";
+const POLYGON_ENDPOINT = process.env.POLYGON_ENDPOINT !== undefined ? process.env.POLYGON_ENDPOINT : "https://polygon-rpc.com";
+
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -56,8 +58,8 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {
       forking:{
-          url: MOONBEAM_ENDPOINT,
-          blockNumber: 2574367
+          url: POLYGON_ENDPOINT,
+          // blockNumber: 2612198
       },
       accounts: {
         count: 50
