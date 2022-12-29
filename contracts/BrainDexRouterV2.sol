@@ -3,8 +3,6 @@
 pragma solidity 0.8.15;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import { IKPool } from"./interface/IKPool.sol";
-import { ISaddleStableSwap } from "./interface/ISaddleStableSwap.sol";
 import { IWETH } from "./interface/IWETH.sol";
 import { IERC20 } from "./interface/IERC20.sol";
 import { IBrainDexExecutor } from "./interface/IBrainDexExecutor.sol";
@@ -68,7 +66,7 @@ contract BrainDexRouterV2 is Ownable {
      * @param to Address to recieve resulting amount of tokenOut tokens.
      * @param amountOutMin Minimum amount of tokenOut to recieve, pre optimizer fee.
      * @param deadline Deadline for executing the swap. The transaction will revert if blocktime exceeds `deadline`.
-     * @param swapData bytes package defining swap paramters for the executor contract.
+     * @param swapData bytes package defining swap parameters for the executor contract.
     */
     function multiSwapEthForTokens(
         address tokenOut,
@@ -83,6 +81,7 @@ contract BrainDexRouterV2 is Ownable {
 
         IWETH(WETH).deposit{value: msg.value}();
         TransferHelper.safeTransfer(WETH, address(_executor), msg.value);
+        
         _executor.executeSplitSwap(
             WETH,
             tokenOut,
@@ -109,7 +108,7 @@ contract BrainDexRouterV2 is Ownable {
      * @param amountIn Amount of `tokenIn` tokens with which to initiate the swap.
      * @param amountOutMin Minimum amount of tokenOut to recieve, pre optimizer fee.
      * @param deadline Deadline for executing the swap. The transaction will revert if blocktime exceeds `deadline`.
-     * @param swapData bytes package defining swap paramters for the executor contract.
+     * @param swapData bytes package defining swap parameters for the executor contract.
     */
     function multiSwapTokensForEth(
         address tokenIn,
@@ -153,7 +152,7 @@ contract BrainDexRouterV2 is Ownable {
      * @param amountIn Amount of `tokenIn` tokens with which to initiate the swap.
      * @param amountOutMin Minimum amount of tokenOut to recieve, pre optimizer fee.
      * @param deadline Deadline for executing the swap. The transaction will revert if blocktime exceeds `deadline`.
-     * @param swapData bytes package defining swap paramters for the executor contract. 
+     * @param swapData bytes package defining swap parameters for the executor contract.
     */
     function multiSwapTokensForTokens(
         address tokenIn,
@@ -187,7 +186,10 @@ contract BrainDexRouterV2 is Ownable {
         address receiver = to == address(0) ? msg.sender : to;
         // Transfer tokens net fees to user.
         TransferHelper.safeTransfer(tokenOut, receiver, netTokens);
+    }
 
+    function getMultiSwapAmountOut(bytes calldata data) public view returns(uint256) {
+        return IBrainDexExecutor(_executor).getSplitSwapAmountOut(data);
     }
 
     function _sendAdminFee(
@@ -196,7 +198,7 @@ contract BrainDexRouterV2 is Ownable {
         uint256 amountOutMin
     ) internal returns(uint256) {
         (uint256 feeAmount, uint256 amountNetFee) = _getFee(netTokens, amountOutMin);
-        TransferHelper.safeTransfer(token, owner(), feeAmount);
+        TransferHelper.safeTransfer(token, _feeDeposit, feeAmount);
         return amountNetFee;
     }
 
@@ -231,6 +233,10 @@ contract BrainDexRouterV2 is Ownable {
     function _sendEth(address to, uint256 value) internal {
         (bool success, ) = to.call{value: value}(new bytes(0));
         if(!success) revert BDEX_EthTransferFailed();
+    }
+
+    function feeDeposit() external view returns(address) {
+        return _feeDeposit;
     }
 
     function setFeeDeposit(address newFeeDeposit) external onlyOwner {
