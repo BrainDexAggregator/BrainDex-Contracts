@@ -5,7 +5,7 @@ import { ethers } from "hardhat";
 import { AbiCoder } from "ethers/lib/utils";
 import { deployments } from "../constants/deployments";
 
-import { brainDexExecutorAbi } from "../constants/brainDexExecutorAbi";
+import { brainDexExecutorData } from "../constants/brainDexExecutor";
 
 const abiCoder = ethers.utils.defaultAbiCoder;
 
@@ -27,7 +27,7 @@ function encodeSwapData(data: any) {
     return swapData
 }
 
-describe("BrainDex", function () {
+describe.skip("BrainDex", function () {
     async function deployBrainDexFixture() {
         const now = await time.latest();
 
@@ -56,7 +56,7 @@ describe("BrainDex", function () {
         const [owner, otherAccount] = await ethers.getSigners();
 
         const executorAddress =  deployments.moonbeamExecutor//Moonbeam
-        const executor = new ethers.Contract(executorAddress, brainDexExecutorAbi, owner);
+        const executor = new ethers.Contract(executorAddress, brainDexExecutorData.abi, owner);
 
         // const BrainDexExecutor = await ethers.getContractFactory("BrainDexExecutor");
         // const executor = await BrainDexExecutor.deploy();

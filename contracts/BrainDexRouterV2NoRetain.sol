@@ -22,7 +22,7 @@ error BDEX_SwapDataZero();
 
 error BDEX_EthTransferFailed();
 
-contract BrainDexRouterV2 is Ownable {
+contract BrainDexRouterV2NoRetain is Ownable {
 
     address private _feeDeposit;
     uint256 private _minFee; // In bips
@@ -90,7 +90,7 @@ contract BrainDexRouterV2 is Ownable {
         );
 
         // Final balance checking
-        uint256 netTokens = IERC20(tokenOut).balanceOf(address(this)) - 1;
+        uint256 netTokens = IERC20(tokenOut).balanceOf(address(this));
 
         if (netTokens < amountOutMin) revert BDEX_AmountOutLow();
 
@@ -132,7 +132,7 @@ contract BrainDexRouterV2 is Ownable {
             swapData
         );
         // Final balance checking
-        uint256 netTokens = IERC20(WETH).balanceOf(address(this)) - 1;
+        uint256 netTokens = IERC20(WETH).balanceOf(address(this));
         
         if (netTokens < amountOutMin) revert BDEX_AmountOutLow();
         
@@ -178,7 +178,7 @@ contract BrainDexRouterV2 is Ownable {
         );
 
         // Final balance checking
-        uint256 netTokens = IERC20(tokenOut).balanceOf(address(this)) - 1;
+        uint256 netTokens = IERC20(tokenOut).balanceOf(address(this));
 
         if (netTokens < amountOutMin) revert BDEX_AmountOutLow();
         // netTokens = _feeOn ? _sendAdminFee(tokenOut, netTokens, amountOutMin) : netTokens;
