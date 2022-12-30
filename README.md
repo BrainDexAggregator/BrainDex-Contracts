@@ -1,8 +1,13 @@
 # BrainDex Smart Contracts
 
-Core smart contract repo for BrainDex aggregator.
+Branch for testing gas optimization of BrainDex aggregation router.
 
-Tests are configured for Moonbeam, assume a forked chain state, and require a patched json-rpc/client.js to run correctly.
+This test is configured to run on a forked Polygon mainnet environment.
+
+To install:
+```shell
+npm i
+```
 
 To run:
 ```shell
