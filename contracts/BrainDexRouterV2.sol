@@ -90,7 +90,7 @@ contract BrainDexRouterV2 is Ownable {
         );
 
         // Final balance checking
-        uint256 netTokens = IERC20(tokenOut).balanceOf(address(this)) - 1;
+        uint256 netTokens = IERC20(tokenOut).balanceOf(address(this));
 
         if (netTokens < amountOutMin) revert BDEX_AmountOutLow();
 
@@ -132,7 +132,7 @@ contract BrainDexRouterV2 is Ownable {
             swapData
         );
         // Final balance checking
-        uint256 netTokens = IERC20(WETH).balanceOf(address(this)) - 1;
+        uint256 netTokens = IERC20(WETH).balanceOf(address(this));
         
         if (netTokens < amountOutMin) revert BDEX_AmountOutLow();
         
@@ -178,7 +178,7 @@ contract BrainDexRouterV2 is Ownable {
         );
 
         // Final balance checking
-        uint256 netTokens = IERC20(tokenOut).balanceOf(address(this)) - 1;
+        uint256 netTokens = IERC20(tokenOut).balanceOf(address(this));
 
         if (netTokens < amountOutMin) revert BDEX_AmountOutLow();
         netTokens = _feeOn ? _sendAdminFee(tokenOut, netTokens, amountOutMin) : netTokens;
@@ -198,6 +198,8 @@ contract BrainDexRouterV2 is Ownable {
         uint256 amountOutMin
     ) internal returns(uint256) {
         (uint256 feeAmount, uint256 amountNetFee) = _getFee(netTokens, amountOutMin);
+        // Leave 1 wei on the router here for gas optimization
+        --feeAmount;
         TransferHelper.safeTransfer(token, _feeDeposit, feeAmount);
         return amountNetFee;
     }

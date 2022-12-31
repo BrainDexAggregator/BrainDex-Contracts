@@ -64,11 +64,81 @@ describe("BrainDex", function () {
         const BrainDexRouter = await ethers.getContractFactory("BrainDexRouterV2");
         const router = await BrainDexRouter.deploy(WETH, executorAddress);
 
+        const singleRoute1 ={
+            amountIn: makeBigNumber(10, 18), // 400 WGLMR
+            pools: [
+                WETH_USDC_MC,
+                STEL_STAB_4POOL
+            ],
+            //WETH > USDC > BUSD
+            swapData: [
+                {
+                    swapType: 1,
+                    poolInPos: 1,
+                    poolOutPos: 0,
+                    tokenOut: "0x931715FEE2d06333043d11F658C8CE934aC61D0c",
+                    poolFee: 997500
+                },{
+                    swapType: 3,
+                    poolInPos: 0,
+                    poolOutPos: 2,
+                    tokenOut: "0x692c57641fc054c2ad6551ccc6566eba599de1ba",
+                    poolFee: 0
+                }
+            ]
+        }
+
+        const splitRoute1 ={
+            amountIn: makeBigNumber(45, 19), // 400 WGLMR
+            pools: [
+                WETH_USDC_MC,
+                STEL_STAB_4POOL
+            ],
+            //WETH > USDC > BUSD
+            swapData: [
+                {
+                    swapType: 1,
+                    poolInPos: 1,
+                    poolOutPos: 0,
+                    tokenOut: "0x931715FEE2d06333043d11F658C8CE934aC61D0c",
+                    poolFee: 997500
+                },{
+                    swapType: 3,
+                    poolInPos: 0,
+                    poolOutPos: 2,
+                    tokenOut: "0x692c57641fc054c2ad6551ccc6566eba599de1ba",
+                    poolFee: 0
+                }
+            ]
+        }
+
+        const splitRoute2 ={
+            amountIn: makeBigNumber(5, 19), // 100 WGLMR
+            pools: [
+                "0x88c3c88f668aaec67a454b3c931ed70a37e7c467"
+            ],
+            //WETH > BUSD
+            swapData: [
+                {
+                    swapType: 1,
+                    poolInPos: 1,
+                    poolOutPos: 0,
+                    tokenOut: "0x692c57641fc054c2ad6551ccc6566eba599de1ba",
+                    poolFee: 997500
+                }
+            ]
+        }
+
+        const singleSwapData = encodeSwapData([singleRoute1]);
+        const splitSwapData = encodeSwapData([splitRoute1, splitRoute2]);
+
+
         return {
             router, executor, owner, otherAccount, now, WETH,
             BUSD, USDC_WH, USDC_MC, XC_DOT, XC_INTR, XC_TUSD, WELL,
             WETH_USDC_MC, STEL_STAB_4POOL,
-            WETH_CONTRACT, BUSD_CONTRACT, USDC_WH_CONTRACT
+            WETH_CONTRACT, BUSD_CONTRACT, USDC_WH_CONTRACT,
+            splitSwapData, singleSwapData
         };
     }
 
@@ -87,59 +157,10 @@ describe("BrainDex", function () {
     describe("Views", function () {
         describe("Get SplitSwap amounts out", function () {
             it("GetSplitSwapAmountOut ending with Stablepool", async function () {
-                const { router, executor, WETH_USDC_MC, STEL_STAB_4POOL } = await loadFixture(deployBrainDexFixture);
-                const route1 ={
-                    amountIn: makeBigNumber(45, 19), // 400 WGLMR
-                    pools: [
-                        WETH_USDC_MC,
-                        STEL_STAB_4POOL
-                    ],
-                    //WETH > USDC > BUSD
-                    swapData: [
-                        {
-                            swapType: 1,
-                            poolInPos: 1,
-                            poolOutPos: 0,
-                            tokenOut: "0x931715FEE2d06333043d11F658C8CE934aC61D0c",
-                            poolFee: 997500
-                        },{
-                            swapType: 3,
-                            poolInPos: 0,
-                            poolOutPos: 2,
-                            tokenOut: "0x692c57641fc054c2ad6551ccc6566eba599de1ba",
-                            poolFee: 0
-                        }
-                    ]
-                }
+                const { router, executor, WETH_USDC_MC, STEL_STAB_4POOL, splitSwapData } = await loadFixture(deployBrainDexFixture);
 
-                const route2 ={
-                    amountIn: makeBigNumber(5, 19), // 100 WGLMR
-                    pools: [
-                        "0x88c3c88f668aaec67a454b3c931ed70a37e7c467"
-                    ],
-                    //WETH > BUSD
-                    swapData: [
-                        {
-                            swapType: 1,
-                            poolInPos: 1,
-                            poolOutPos: 0,
-                            tokenOut: "0x692c57641fc054c2ad6551ccc6566eba599de1ba",
-                            poolFee: 997500
-                        }
-                    ]
-                }
-
-                const swapData = encodeSwapData([route1, route2]);
-
-                const amountOut = await executor.getSplitSwapAmountOut(swapData);
+                const amountOut = await router.getMultiSwapAmountOut(splitSwapData);
                 expect(amountOut).to.equal(toBigNum("152210891037818427089"));
-                const amountsOut = await executor.getSplitSwapAmountsOut(swapData);
-                expect(amountsOut).to.eql(
-                    [
-                    [toBigNum("450000000000000000000"), toBigNum("150688750"), toBigNum("150728470056383184273")],
-                    [toBigNum("50000000000000000000"), toBigNum("1482420981435242816")]
-                    ]
-                )
             });
         });
     });
@@ -150,35 +171,33 @@ describe("BrainDex", function () {
                 const { 
                     router, executor, WETH, BUSD, WETH_USDC_MC, USDC_WH, STEL_STAB_4POOL,
                     WETH_CONTRACT, BUSD_CONTRACT, 
-                    owner, otherAccount, now 
+                    owner, otherAccount, now ,
+                    singleSwapData
                 } = await loadFixture(deployBrainDexFixture);
 
-                const route1 ={
-                    amountIn: makeBigNumber(10, 18), // 400 WGLMR
-                    pools: [
-                        WETH_USDC_MC,
-                        "0xb1bc9f56103175193519ae1540a0a4572b1566f6"
-                    ],
-                    //WETH > USDC > BUSD
-                    swapData: [
-                        {
-                            swapType: 1,
-                            poolInPos: 1,
-                            poolOutPos: 0,
-                            tokenOut: "0x931715FEE2d06333043d11F658C8CE934aC61D0c",
-                            poolFee: 997500
-                        },{
-                            swapType: 3,
-                            poolInPos: 0,
-                            poolOutPos: 2,
-                            tokenOut: "0x692c57641fc054c2ad6551ccc6566eba599de1ba",
-                            poolFee: 0
-                        }
-                    ]
-                }
+                const amountOut = await executor.getSplitSwapAmountOut(singleSwapData);
+                const fees = await router.getFee(amountOut, 1);
+                expect(amountOut).to.equal(fees[0].add(fees[1]));
 
-                const swapData = encodeSwapData([route1])
-                const amountOut = await executor.getSplitSwapAmountOut(swapData);
+                await router.connect(otherAccount).multiSwapEthForTokens(
+                    BUSD,
+                    otherAccount.address,
+                    1,
+                    now + 1000,
+                    singleSwapData,
+                    {value: makeBigNumber(10, 18)}
+                )
+            });
+
+            it("multiSwapEthForTokens deducts eth from user", async function () {
+                const { 
+                    router, executor, WETH, BUSD, WETH_USDC_MC, USDC_WH, STEL_STAB_4POOL,
+                    WETH_CONTRACT, BUSD_CONTRACT, 
+                    owner, otherAccount, now ,
+                    singleSwapData
+                } = await loadFixture(deployBrainDexFixture);
+
+                const amountOut = await executor.getSplitSwapAmountOut(singleSwapData);
                 const fees = await router.getFee(amountOut, 1);
                 expect(amountOut).to.equal(fees[0].add(fees[1]));
 
@@ -187,12 +206,206 @@ describe("BrainDex", function () {
                     otherAccount.address,
                     1,
                     now + 1000,
-                    swapData,
+                    singleSwapData,
                     {value: makeBigNumber(10, 18)}
                 ))
                 .to.changeEtherBalance(otherAccount.address, makeBigNumber(10, 18).mul(-1))
-                .to.changeTokenBalance(BUSD_CONTRACT, otherAccount.address, fees[1])
-                .to.changeTokenBalance(BUSD_CONTRACT, owner.address, fees[0])
+            });
+
+            it("multiSwapEthForTokens leaves 1 wei on executor", async function () {
+                const { 
+                    router, executor, WETH, BUSD, WETH_USDC_MC, USDC_WH, STEL_STAB_4POOL,
+                    WETH_CONTRACT, BUSD_CONTRACT, 
+                    owner, otherAccount, now ,
+                    singleSwapData
+                } = await loadFixture(deployBrainDexFixture);
+
+                const amountOut = await executor.getSplitSwapAmountOut(singleSwapData);
+                const fees = await router.getFee(amountOut, 1);
+                expect(amountOut).to.equal(fees[0].add(fees[1]));
+
+                await expect(router.connect(otherAccount).multiSwapEthForTokens(
+                    BUSD,
+                    otherAccount.address,
+                    1,
+                    now + 1000,
+                    singleSwapData,
+                    {value: makeBigNumber(10, 18)}
+                ))
+                .to.changeTokenBalance(BUSD_CONTRACT, executor.address, 1)
+            });
+
+            it("multiSwapEthForTokens leaves 1 wei on router", async function () {
+                const { 
+                    router, executor, WETH, BUSD, WETH_USDC_MC, USDC_WH, STEL_STAB_4POOL,
+                    WETH_CONTRACT, BUSD_CONTRACT, 
+                    owner, otherAccount, now ,
+                    singleSwapData
+                } = await loadFixture(deployBrainDexFixture);
+
+                const amountOut = await executor.getSplitSwapAmountOut(singleSwapData);
+                const fees = await router.getFee(amountOut, 1);
+                expect(amountOut).to.equal(fees[0].add(fees[1]));
+
+                await expect(router.connect(otherAccount).multiSwapEthForTokens(
+                    BUSD,
+                    otherAccount.address,
+                    1,
+                    now + 1000,
+                    singleSwapData,
+                    {value: makeBigNumber(10, 18)}
+                ))
+                .to.changeTokenBalance(BUSD_CONTRACT, router.address, 1)
+            });
+
+            it("multiSwapEthForTokens takes correct for from admin", async function () {
+                const { 
+                    router, executor, WETH, BUSD, WETH_USDC_MC, USDC_WH, STEL_STAB_4POOL,
+                    WETH_CONTRACT, BUSD_CONTRACT, 
+                    owner, otherAccount, now ,
+                    singleSwapData
+                } = await loadFixture(deployBrainDexFixture);
+
+                const amountOut = await executor.getSplitSwapAmountOut(singleSwapData);
+                const fees = await router.getFee(amountOut, 1);
+                expect(amountOut).to.equal(fees[0].add(fees[1]));
+
+                await expect(router.connect(otherAccount).multiSwapEthForTokens(
+                    BUSD,
+                    otherAccount.address,
+                    1,
+                    now + 1000,
+                    singleSwapData,
+                    {value: makeBigNumber(10, 18)}
+                ))
+                .to.changeTokenBalance(BUSD_CONTRACT, owner.address, fees[0].sub(1))
+            });
+
+            it("multiSwapEthForTokens returns correct value to user, net 1 for executor", async function () {
+                const { 
+                    router, executor, WETH, BUSD, WETH_USDC_MC, USDC_WH, STEL_STAB_4POOL,
+                    WETH_CONTRACT, BUSD_CONTRACT, 
+                    owner, otherAccount, now ,
+                    singleSwapData
+                } = await loadFixture(deployBrainDexFixture);
+
+                const amountOut = await executor.getSplitSwapAmountOut(singleSwapData);
+                const fees = await router.getFee(amountOut, 1);
+                expect(amountOut).to.equal(fees[0].add(fees[1]));
+
+                await expect(router.connect(otherAccount).multiSwapEthForTokens(
+                    BUSD,
+                    otherAccount.address,
+                    1,
+                    now + 1000,
+                    singleSwapData,
+                    {value: makeBigNumber(10, 18)}
+                ))
+                .to.changeTokenBalance(BUSD_CONTRACT, otherAccount.address, fees[1].sub(1))
+            });
+
+            it("After the second transaction, executor balance should not change", async function () {
+                const { 
+                    router, executor, WETH, BUSD, WETH_USDC_MC, USDC_WH, STEL_STAB_4POOL,
+                    WETH_CONTRACT, BUSD_CONTRACT, 
+                    owner, otherAccount, now ,
+                    singleSwapData
+                } = await loadFixture(deployBrainDexFixture);
+
+                const amountOut = await executor.getSplitSwapAmountOut(singleSwapData);
+                const fees = await router.getFee(amountOut, 1);
+                expect(amountOut).to.equal(fees[0].add(fees[1]));
+
+                await expect(router.connect(otherAccount).multiSwapEthForTokens(
+                    BUSD,
+                    otherAccount.address,
+                    1,
+                    now + 1000,
+                    singleSwapData,
+                    {value: makeBigNumber(10, 18)}
+                ))
+                .to.changeTokenBalance(BUSD_CONTRACT, executor.address, 1)
+
+                await expect(router.connect(otherAccount).multiSwapEthForTokens(
+                    BUSD,
+                    otherAccount.address,
+                    1,
+                    now + 1000,
+                    singleSwapData,
+                    {value: makeBigNumber(10, 18)}
+                ))
+                .to.changeTokenBalance(BUSD_CONTRACT, executor.address, 0)
+            });
+
+            it("After the second transaction, router balance should not change", async function () {
+                const { 
+                    router, executor, WETH, BUSD, WETH_USDC_MC, USDC_WH, STEL_STAB_4POOL,
+                    WETH_CONTRACT, BUSD_CONTRACT, 
+                    owner, otherAccount, now ,
+                    singleSwapData
+                } = await loadFixture(deployBrainDexFixture);
+
+                const amountOut = await executor.getSplitSwapAmountOut(singleSwapData);
+                const fees = await router.getFee(amountOut, 1);
+                expect(amountOut).to.equal(fees[0].add(fees[1]));
+
+                await expect(router.connect(otherAccount).multiSwapEthForTokens(
+                    BUSD,
+                    otherAccount.address,
+                    1,
+                    now + 1000,
+                    singleSwapData,
+                    {value: makeBigNumber(10, 18)}
+                ))
+                .to.changeTokenBalance(BUSD_CONTRACT, router.address, 1)
+                
+                await expect(router.connect(otherAccount).multiSwapEthForTokens(
+                    BUSD,
+                    otherAccount.address,
+                    1,
+                    now + 1000,
+                    singleSwapData,
+                    {value: makeBigNumber(10, 18)}
+                ))
+                .to.changeTokenBalance(BUSD_CONTRACT, router.address, 0)
+            });
+
+            it("After the second transaction, user recieved amount should be equal to fee", async function () {
+                const { 
+                    router, executor, WETH, BUSD, WETH_USDC_MC, USDC_WH, STEL_STAB_4POOL,
+                    WETH_CONTRACT, BUSD_CONTRACT, 
+                    owner, otherAccount, now ,
+                    singleSwapData
+                } = await loadFixture(deployBrainDexFixture);
+
+                const amountOut = await executor.getSplitSwapAmountOut(singleSwapData);
+                const fees = await router.getFee(amountOut, 1);
+                expect(amountOut).to.equal(fees[0].add(fees[1]));
+
+                await expect(router.connect(otherAccount).multiSwapEthForTokens(
+                    BUSD,
+                    otherAccount.address,
+                    1,
+                    now + 1000,
+                    singleSwapData,
+                    {value: makeBigNumber(10, 18)}
+                ))
+                .to.changeTokenBalance(BUSD_CONTRACT, otherAccount.address, fees[1].sub(1))
+
+                await mine(1);
+
+                const amountOut2 = await executor.getSplitSwapAmountOut(singleSwapData);
+                const fees2 = await router.getFee(amountOut2.add(1), 1);
+                
+                await expect(router.connect(otherAccount).multiSwapEthForTokens(
+                    BUSD,
+                    otherAccount.address,
+                    1,
+                    now + 1000,
+                    singleSwapData,
+                    {value: makeBigNumber(10, 18)}
+                ))
+                .to.changeTokenBalance(BUSD_CONTRACT, otherAccount.address, fees2[1])
             });
 
             it("multiSwapEthForTokens multi path", async function () {
@@ -259,7 +472,7 @@ describe("BrainDex", function () {
                 ))
                 .to.changeEtherBalance(otherAccount.address, makeBigNumber(20, 18).mul(-1))
                 .to.changeTokenBalance(BUSD_CONTRACT, otherAccount.address, fees[1])
-                .to.changeTokenBalance(BUSD_CONTRACT, owner.address, fees[0])
+                .to.changeTokenBalance(BUSD_CONTRACT, owner.address, fees[0].sub(1))
 
             });
 
@@ -315,7 +528,7 @@ describe("BrainDex", function () {
                 ))
                 .to.changeTokenBalance(WETH_CONTRACT, otherAccount.address, makeBigNumber(10, 18).mul(-1))
                 .to.changeTokenBalance(BUSD_CONTRACT, otherAccount.address, fees[1].add)
-                .to.changeTokenBalance(BUSD_CONTRACT, owner.address, fees[0])
+                .to.changeTokenBalance(BUSD_CONTRACT, owner.address, fees[0].sub(1))
             });
 
             it("multiSwapTokensForTokens multi path", async function () {
@@ -387,7 +600,7 @@ describe("BrainDex", function () {
                 ))
                 .to.changeTokenBalance(WETH_CONTRACT, otherAccount.address, makeBigNumber(20, 18).mul(-1))
                 .to.changeTokenBalance(BUSD_CONTRACT, otherAccount.address, fees[1])
-                .to.changeTokenBalance(BUSD_CONTRACT, owner.address, fees[0])
+                .to.changeTokenBalance(BUSD_CONTRACT, owner.address, fees[0].sub(1))
 
                 await mine(1);
 
@@ -406,7 +619,7 @@ describe("BrainDex", function () {
                 ))
                 .to.changeTokenBalance(WETH_CONTRACT, otherAccount.address, makeBigNumber(20, 18).mul(-1))
                 .to.changeTokenBalance(BUSD_CONTRACT, otherAccount.address, fees2[1])
-                .to.changeTokenBalance(BUSD_CONTRACT, owner.address, fees2[0])
+                .to.changeTokenBalance(BUSD_CONTRACT, owner.address, fees2[0].sub(1))
 
             });
 
@@ -497,7 +710,7 @@ describe("BrainDex", function () {
                 ))
                 .to.changeTokenBalance(BUSD_CONTRACT, otherAccount.address, makeBigNumber(10, 18).mul(-1))
                 .to.changeEtherBalance(otherAccount.address, fees[1])
-                .to.changeTokenBalance(WETH_CONTRACT, owner.address, fees[0])
+                .to.changeTokenBalance(WETH_CONTRACT, owner.address, fees[0].sub(1))
             });
 
             it("multiSwapTokensForEth multi path", async function () {
